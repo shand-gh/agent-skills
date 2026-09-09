@@ -35,8 +35,7 @@ and creates links such as:
 ```
 
 It works from any working directory and leaves unrelated skills alone. Running
-it again leaves correct links unchanged. It does not fetch from GitHub, invoke
-either agent, install kata, or stage/commit changes.
+it again leaves correct links unchanged.
 
 ### Replace existing copies
 
@@ -81,8 +80,7 @@ symlinks is a straightforward fit for personal skills you edit locally.
 ```
 
 Choose one Codex location; the installer does not migrate or remove skills in
-the other location. When switching, remove the old kata installation yourself
-after preserving any local changes, so you do not keep competing copies.
+the other location.
 
 For custom configuration locations, specify either or both directories:
 
@@ -94,25 +92,3 @@ The script does not infer custom harness homes from environment variables.
 `./install.sh --help` lists its options. Plugins are another distribution option
 when sharing packaged capabilities beyond a personal checkout; they add
 packaging and lifecycle work that this small repository does not need.
-
-## Use and maintain
-
-Ask the agent to use kata in a project where you want tracked development work.
-Read [the skill](kata/SKILL.md) for setup, planning, and implementation details.
-Start a fresh agent session if updated instructions are not picked up; editing
-the file does not guarantee an already-running agent has reread it.
-
-Edit skill files here, review the diff, and commit/push when ready. To receive
-updates on another machine, pull this repository. Existing links still point to
-the updated files. Rerun the installer when adding skills or moving the checkout.
-
-To add a skill, create `<skill-name>/SKILL.md` at the repository root, with YAML
-frontmatter containing its `name` and `description`. Supporting scripts,
-references, and assets belong inside that directory. Use a lowercase,
-hyphen-separated directory name matching the skill name. The installer links
-the whole directory and does not validate the skill's contents.
-
-To uninstall a skill, first confirm the installed entry is a symlink with
-`ls -ld`, then remove just that link with `unlink /path/to/skills/kata`. Do not
-add a trailing slash. This leaves the repository intact. Restore an earlier
-installation by moving its printed backup path back to the now-vacant location.
