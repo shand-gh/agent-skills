@@ -245,6 +245,8 @@ Claude runs the per-iteration loop until the evaluator confirms the condition.
 
 ```
 /goal Work the kata backlog to empty. Each turn: run `kata ready --json`, take the top ready ticket, do the work required to satisfy its acceptance criteria, verify it, then close it with typed evidence. If a ticket cannot proceed without input from me, comment what is blocking it and label it blocked, then move on. The condition is met when `kata ready` returns no tickets that are actionable without my input — i.e. every remaining ready ticket is labeled blocked pending an action from me, or the list is empty. Print the `kata ready` output each turn so completion can be verified.
+
+Use the kata skill and read each ticket’s full body, comments, and referenced guidance before implementation. Follow repository instructions where they override the generic skill, including branch/PR requirements. Follow each ticket’s verification plan and distinguish automated evidence from outstanding user acceptance. Before marking a ticket blocked, complete all implementation and verification that can proceed without the missing input, and leave a concrete handoff stating exactly what remains.
 ```
 
 **Per-iteration loop (what each goal turn does):**
