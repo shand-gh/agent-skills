@@ -7,6 +7,7 @@ description: >-
   project (and loads this workflow). PLAN: decompose any feature request, bug report,
   or non-trivial task into kata tickets — top-level tickets are Mike Cohn user
   stories with Gherkin acceptance criteria; search existing tickets first.
+  WORK: `$kata work ID` implements one ticket without a goal loop.
   IMPLEMENT: `/kata implement` starts a /goal loop that works `kata ready` tickets
   to completion. FINISH: commit (Conventional Commits) or merge, footer the kata
   ticket IDs, capture context as ticket comments, and file follow-up tickets for
@@ -22,6 +23,9 @@ it across the full lifecycle of software work: **plan → implement → finish**
 Run `kata quickstart` any time you need a refresher on kata's own conventions;
 the rules there (close asserts completion, search before create, eager closes,
 typed evidence) always take precedence over anything summarized here.
+
+Repository instructions and explicit user requests override this skill's generic
+workflow, including its branch, commit, PR, merge, and verification defaults.
 
 ## Prerequisites (check once per workspace)
 
@@ -232,7 +236,52 @@ file and reference it from the ticket body instead of inlining everything.
 
 ---
 
-## Phase 2 — Implementing tickets (`/kata implement`)
+## Phase 2 — Implementing tickets
+
+### One ticket (`$kata work <ref>`)
+
+When the user invokes **`$kata work <ref>`** (or **`/kata work <ref>`**),
+implement only the named ticket in the current workspace. This is an instruction
+to the agent through the skill, not a `kata work` CLI subcommand. Accept a short
+ID or qualified reference such as `kata#abc4`. Do not start or propose a `/goal`
+loop, select work from `kata ready`, or continue to another ticket afterward.
+If the reference is missing, ask which ticket to work.
+
+1. Read `kata show <ref> --json`, including the full body, comments,
+   relationships, referenced guidance, and repository instructions. If already
+   closed, report its status rather than reopening it automatically. If it is
+   a parent with open children, recommend a ready child and ask which child to
+   work; do not silently expand one-ticket scope into its entire subtree.
+2. Check dependencies and ownership before claiming the ticket using kata's
+   current claim workflow. Do not take over another agent's active work or
+   implement prerequisite tickets implicitly. Follow the repository's branch/PR
+   rules wherever they override Phase 3's generic defaults.
+3. Complete the implementation and the ticket's verification plan. Favor simple
+   designs, remove superseded code and tests while preserving still-required
+   assertions, and avoid unrelated changes. Verify actual behavior at the
+   appropriate layer; a test of the suspected cause alone does not establish
+   that the user's reported flow works. Reuse relevant evidence and broaden
+   testing only as required by the ticket, repository, or changed risks.
+4. Before declaring a blocker, finish all implementation and verification that
+   can proceed independently of the missing input. If hardware verification,
+   user acceptance, or another prerequisite remains, leave the ticket open,
+   record completed work and evidence plus exactly what remains, and mark it
+   blocked/release ownership when appropriate. Do not claim an unverified
+   outcome or stop useful independent work merely because final acceptance
+   requires the user.
+5. Otherwise, finish the repository's delivery workflow and close with typed
+   evidence per Phase 3. Report what changed, what was verified, the PR or commit
+   reference, and anything requiring the user's attention. Stop after this
+   ticket. Follow-up tickets may capture discoveries per Phase 3, but are not
+   authorization to implement additional work.
+
+Example user message:
+
+```text
+$kata work 9dff
+```
+
+### Backlog loop (`/kata implement`)
 
 When the user invokes **`/kata implement`**, kick off a `/goal` loop that drives
 the ready backlog to completion.
