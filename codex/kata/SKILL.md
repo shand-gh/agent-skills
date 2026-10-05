@@ -3,15 +3,16 @@ name: kata
 description: >-
   Manage software development work with kata, an agent-first ticket tracker. Use
   this whenever you start, plan, implement, or finish non-trivial software work
-  in a kata-tracked workspace. SETUP: `/kata init` binds the workspace to a kata
+  in a kata-tracked workspace. SETUP: `$kata init` binds the workspace to a kata
   project (and loads this workflow). PLAN: decompose any feature request, bug report,
   or non-trivial task into kata tickets — top-level tickets are Mike Cohn user
   stories with Gherkin acceptance criteria; search existing tickets first.
   WORK: `$kata work ID` implements one ticket without a goal loop.
-  IMPLEMENT: `/kata implement` starts a /goal loop that works `kata ready` tickets
-  to completion. FINISH: commit (Conventional Commits) or merge, footer the kata
-  ticket IDs, capture context as ticket comments, and file follow-up tickets for
-  newly discovered work. Reach for this on essentially any non-trivial coding task.
+  IMPLEMENT: `$kata goal` starts a goal loop that works `kata ready` tickets
+  to completion. FINISH: commit (Conventional Commits)
+  or merge, footer the kata ticket IDs, capture context as ticket comments, and
+  file follow-up tickets for newly discovered work. Reach for this on essentially
+  any non-trivial coding task.
 ---
 
 # kata workflow
@@ -44,9 +45,9 @@ workflow, including its branch, commit, PR, merge, and verification defaults.
 
 ---
 
-## Phase 0 — Setup (`/kata init`)
+## Phase 0 — Setup (`$kata init`)
 
-When the user invokes **`/kata init`**, get this workspace ready to track work
+When the user invokes **`$kata init`**, get this workspace ready to track work
 with kata. Invoking it also pulls this whole skill into context, so it doubles
 as "load the kata workflow for this session."
 
@@ -240,7 +241,7 @@ file and reference it from the ticket body instead of inlining everything.
 
 ### One ticket (`$kata work <ref>`)
 
-When the user invokes **`$kata work <ref>`** (or **`/kata work <ref>`**),
+When the user invokes **`$kata work <ref>`**,
 implement only the named ticket in the current workspace. This is an instruction
 to the agent through the skill, not a `kata work` CLI subcommand. Accept a short
 ID or qualified reference such as `kata#abc4`. Do not start or propose a `/goal`
@@ -281,19 +282,23 @@ Example user message:
 $kata work 9dff
 ```
 
-### Backlog loop (`/kata implement`)
+### Backlog loop (`$kata goal`)
 
-When the user invokes **`/kata implement`**, kick off a `/goal` loop that drives
-the ready backlog to completion.
+When the user invokes **`$kata goal`**, start a goal loop
+that drives the ready backlog to completion. This is an instruction to the
+agent through the skill, not a `kata goal` CLI subcommand.
 
-`/goal` is set by the user (an agent can't set it mid-turn), so **present the
-exact command below for the user to run.** Once the goal is active, every turn
-Claude runs the per-iteration loop until the evaluator confirms the condition.
+Call `create_goal` with the objective below, then begin working the ready
+backlog in this turn. Codex continues at idle turn boundaries while the goal
+is active. Audit `kata ready` and the ticket evidence before marking the goal
+complete; a pause, interruption, budget limit, or blocker does not establish
+completion. If `create_goal` is unavailable, present the objective as a
+`/goal` command for the user to run.
 
-**Command to surface to the user:**
+**Goal objective (omit the `/goal` prefix when calling `create_goal`):**
 
 ```
-/goal Work the kata backlog to empty. Each turn: run `kata ready --json`, take the top ready ticket, do the work required to satisfy its acceptance criteria, verify it, then close it with typed evidence. If a ticket cannot proceed without input from me, comment what is blocking it and label it blocked, then move on. The condition is met when `kata ready` returns no tickets that are actionable without my input — i.e. every remaining ready ticket is labeled blocked pending an action from me, or the list is empty. Print the `kata ready` output each turn so completion can be verified.
+Work the kata backlog to empty. Each turn: run `kata ready --json`, take the top ready ticket, do the work required to satisfy its acceptance criteria, verify it, then close it with typed evidence. If a ticket cannot proceed without input from me, comment what is blocking it and label it blocked, then move on. The condition is met when `kata ready` returns no tickets that are actionable without my input — i.e. every remaining ready ticket is labeled blocked pending an action from me, or the list is empty. Print the `kata ready` output each turn so completion can be verified.
 
 Use the kata skill and read each ticket’s full body, comments, and referenced guidance before implementation. Follow repository instructions where they override the generic skill, including branch/PR requirements. Follow each ticket’s verification plan and distinguish automated evidence from outstanding user acceptance. Before marking a ticket blocked, complete all implementation and verification that can proceed without the missing input, and leave a concrete handoff stating exactly what remains.
 ```
@@ -325,9 +330,9 @@ Use the kata skill and read each ticket’s full body, comments, and referenced 
    by the change; this is part of maintaining the feature. Preserve each distinct
    assertion in retained coverage or explain why the requirement is retired.
    Keep unrelated suite redesign as follow-up work.
-7. Run the selected verification checks and required gates; the proof must land
-   in the transcript so the `/goal` evaluator can see it. While debugging, rerun
-   the affected case first. Broaden or repeat passing checks when new changes,
+7. Run the selected verification checks and required gates; record the results
+   in the transcript so Codex can audit completion. While debugging,
+   rerun the affected case first. Broaden or repeat passing checks when new changes,
    failures, integration risks, or explicit gates justify it, not automatically
    after every edit. Evaluate material added runtime and fixture reliability
    before retaining a new expensive scenario. Keep scenarios independently
@@ -351,8 +356,11 @@ Use the kata skill and read each ticket’s full body, comments, and referenced 
 ## Phase 3 — Finishing tickets
 
 Do this as each ticket's work is verified — **close eagerly, not in one batch at
-the end** (the daemon throttles >3 sibling closes by one actor under one parent
-within 5 minutes).
+the end**. In kata 0.18.0, sibling-close burst throttling is disabled by
+default. A daemon operator can enable it with `[close.throttle] enabled = true`;
+the default burst window is then 60 seconds. Check the daemon's configuration
+if a close is refused for throttling. The parent-completeness, substantive
+message, and evidence requirements still apply.
 
 ### 1. Land the code
 
@@ -429,7 +437,7 @@ to the ticket that surfaced them. Don't silently scope-creep the current ticket.
 | Need | Command |
 | --- | --- |
 | Refresh kata's own rules | `kata quickstart` |
-| Bind a workspace (`/kata init`) | `kata init` · `kata init --project <name>` |
+| Bind a workspace (`$kata init`) | `kata init` · `kata init --project <name>` |
 | Confirm init / actor | `kata list --limit 1` · `kata whoami` |
 | Find prior work/context | `kata search "<query>" --json` |
 | Read a ticket | `kata show <ref> --json` |

@@ -6,7 +6,7 @@ usage() {
     cat <<'EOF'
 Usage: ./install.sh [options]
 
-Link every top-level directory containing SKILL.md into both harnesses.
+Link skills from codex/ and claude/ into their respective harnesses.
 
   --dry-run          Preview without changing files
   --backup           Move conflicting entries outside skill discovery paths
@@ -49,24 +49,33 @@ case "$claude_dir" in /*) ;; *) claude_dir="$PWD/$claude_dir" ;; esac
 destinations=("$codex_dir" "$claude_dir")
 harnesses=(codex claude)
 shopt -s nullglob
-skills=("$repo_dir"/*/SKILL.md)
-[ "${#skills[@]}" -gt 0 ] || die "No top-level skills found in $repo_dir"
+for harness in "${harnesses[@]}"; do
+    skills=("$repo_dir/$harness"/*/SKILL.md)
+    [ "${#skills[@]}" -gt 0 ] || die "No $harness skills found in $repo_dir/$harness"
+done
 
 correct_link() {
     [ -L "$2" ] && [ "$(readlink "$2")" = "$1" ]
 }
 
+legacy_link() {
+    # The previous installer linked both harnesses to a top-level skill.
+    [ -L "$2" ] && [ "$(readlink "$2")" = "$repo_dir/$1" ]
+}
+
 # Preflight every destination before writing anything.
 conflicts=false
-for root in "${destinations[@]}"; do
+for index in 0 1; do
+    root=${destinations[$index]}
     if { [ -e "$root" ] || [ -L "$root" ]; } && [ ! -d "$root" ]; then
         die "Skills directory is not a directory: $root"
     fi
+    skills=("$repo_dir/${harnesses[$index]}"/*/SKILL.md)
     for entry in "${skills[@]}"; do
         source_dir=${entry%/SKILL.md}
         name=${source_dir##*/}
         target="$root/$name"
-        if correct_link "$source_dir" "$target"; then
+        if correct_link "$source_dir" "$target" || legacy_link "$name" "$target"; then
             continue
         fi
         if { [ -e "$target" ] || [ -L "$target" ]; } && ! "$backup"; then
@@ -80,6 +89,7 @@ done
 backup_run=''
 for index in 0 1; do
     root=${destinations[$index]}
+    skills=("$repo_dir/${harnesses[$index]}"/*/SKILL.md)
     for entry in "${skills[@]}"; do
         source_dir=${entry%/SKILL.md}
         name=${source_dir##*/}
@@ -89,7 +99,15 @@ for index in 0 1; do
             continue
         fi
         saved=''
-        if [ -e "$target" ] || [ -L "$target" ]; then
+        old_link=''
+        if legacy_link "$name" "$target"; then
+            old_link=$(readlink "$target")
+            if "$dry_run"; then
+                printf 'Would replace old link: %s\n' "$target"
+            else
+                unlink "$target"
+            fi
+        elif [ -e "$target" ] || [ -L "$target" ]; then
             # Recheck in case something changed after preflight.
             "$backup" || die "Destination appeared during installation: $target"
             if "$dry_run"; then
@@ -113,6 +131,8 @@ for index in 0 1; do
             if ! ln -s -- "$source_dir" "$target"; then
                 if [ -n "$saved" ] && [ ! -e "$target" ] && [ ! -L "$target" ]; then
                     mv -- "$saved" "$target"
+                elif [ -n "$old_link" ] && [ ! -e "$target" ] && [ ! -L "$target" ]; then
+                    ln -s -- "$old_link" "$target"
                 fi
                 die "Could not create link: $target"
             fi

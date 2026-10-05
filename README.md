@@ -1,14 +1,14 @@
 # Agent skills
 
-Personal skills shared between Codex and Claude Code. This repository is the
-source of truth: each harness links to the same skill directory, so an edit or
-`git pull` updates the files available to both without copying them around.
+Personal skills for Codex and Claude Code. This repository is the source of
+truth: the installer links each harness to its own skill directory, so an edit
+or `git pull` updates the installed skill without copying it elsewhere.
 
 ## Available skills
 
 | Skill | Purpose |
 | --- | --- |
-| [kata](kata/SKILL.md) | Plan, implement, verify, and close software work with the kata ticket tracker. Encourages reusing coverage and selecting proportionate tests instead of inventing a full-suite gate for every ticket. |
+| kata: [Codex](codex/kata/SKILL.md) · [Claude Code](claude/kata/SKILL.md) | Plan, implement, verify, and close software work with the kata ticket tracker. Each version uses its harness's skill command syntax and goal workflow. |
 
 The kata skill contains agent instructions, not the kata executable. Install and
 configure the kata CLI separately; `kata quickstart` describes its workflow.
@@ -26,16 +26,17 @@ cd ~/Developer/agent-skills
 ./install.sh
 ```
 
-The installer discovers every immediate child directory containing `SKILL.md`
-and creates links such as:
+The installer discovers skill directories under `codex/` and `claude/` and
+creates links such as:
 
 ```text
-~/.codex/skills/kata  -> /absolute/path/to/agent-skills/kata
-~/.claude/skills/kata -> /absolute/path/to/agent-skills/kata
+~/.codex/skills/kata  -> /absolute/path/to/agent-skills/codex/kata
+~/.claude/skills/kata -> /absolute/path/to/agent-skills/claude/kata
 ```
 
 It works from any working directory and leaves unrelated skills alone. Running
-it again leaves correct links unchanged.
+it again leaves correct links unchanged. Links made by the previous installer
+to the top-level `kata/` directory are replaced automatically.
 
 ### Replace existing copies
 
