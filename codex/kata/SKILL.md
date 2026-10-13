@@ -7,9 +7,10 @@ description: >-
   project (and loads this workflow). PLAN: decompose any feature request, bug report,
   or non-trivial task into kata tickets — top-level tickets are Mike Cohn user
   stories with Gherkin acceptance criteria; search existing tickets first.
-  WORK: `$kata work ID` implements one ticket without a goal loop.
-  IMPLEMENT: `$kata goal` starts a goal loop that works `kata ready` tickets
-  to completion. FINISH: commit (Conventional Commits)
+  WORK: `$kata work ID [ID ...]` works explicit tickets in order.
+  IMPLEMENT: `$kata goal` works the ready backlog, using a fresh worker per
+  ticket by default; `--inline` keeps work in the current session. FINISH:
+  commit (Conventional Commits)
   or merge, footer the kata ticket IDs, capture context as ticket comments, and
   file follow-up tickets for newly discovered work. Reach for this on essentially
   any non-trivial coding task.
@@ -239,24 +240,43 @@ file and reference it from the ticket body instead of inlining everything.
 
 ## Phase 2 — Implementing tickets
 
-### One ticket (`$kata work <ref>`)
+`--inline` is a skill option, not a kata CLI flag. With it, perform ticket work
+in the current conversation. Without it, use a fresh subagent for each ticket.
+The ticket procedure and completion rules are the same in both modes.
 
-When the user invokes **`$kata work <ref>`**,
-implement only the named ticket in the current workspace. This is an instruction
-to the agent through the skill, not a `kata work` CLI subcommand. Accept a short
-ID or qualified reference such as `kata#abc4`. Do not start or propose a `/goal`
-loop, select work from `kata ready`, or continue to another ticket afterward.
-If the reference is missing, ask which ticket to work.
+### Explicit tickets (`$kata work <ref> [<ref> ...] [--inline]`)
+
+When the user invokes **`$kata work <ref> [<ref> ...] [--inline]`**, work only
+the named tickets, in the order given. This is an instruction through the skill,
+not a `kata work` CLI subcommand. Accept short IDs or qualified references such
+as `kata#abc4`; accept `--inline` anywhere among the arguments. Do not start a
+goal loop or select additional work from `kata ready`. If no reference is given,
+ask which ticket to work.
+
+By default, dispatch each ticket to a fresh subagent with `fork_turns: "none"`
+and wait before starting the next. Give it the ticket reference and workspace
+path; tell it to load the kata skill and follow the **Ticket procedure** below.
+Do not pass previous workers' transcripts. With `--inline`, follow that
+procedure yourself, one ticket at a time. After each ticket, check its recorded
+state. If blocked, report it and proceed to the next explicit reference. Stop
+after the last reference.
+
+### Ticket procedure (one assigned reference)
+
+This procedure applies in a dispatched worker or the current conversation when
+`--inline` is selected. Work only the assigned ticket before returning to the
+caller or moving to the next explicit reference. Do not dispatch again from
+inside a worker.
 
 1. Read `kata show <ref> --json`, including the full body, comments,
    relationships, referenced guidance, and repository instructions. If already
    closed, report its status rather than reopening it automatically. If it is
-   a parent with open children, recommend a ready child and ask which child to
-   work; do not silently expand one-ticket scope into its entire subtree.
-2. Check dependencies and ownership before claiming the ticket using kata's
-   current claim workflow. Do not take over another agent's active work or
-   implement prerequisite tickets implicitly. Follow the repository's branch/PR
-   rules wherever they override Phase 3's generic defaults.
+   a parent with open children, report that it is not yet ready for parent
+   completion; do not expand the assignment to its children.
+2. Check dependencies and ownership, then claim the ticket with `kata assign
+   <ref> <actor>` using the actor from `kata whoami`. Do not take over another
+   agent's active work or implement prerequisite tickets implicitly. Follow
+   repository branch/PR rules wherever they override Phase 3's defaults.
 3. Complete the implementation and the ticket's verification plan. Favor simple
    designs, remove superseded code and tests while preserving still-required
    assertions, and avoid unrelated changes. Verify actual behavior at the
@@ -267,47 +287,59 @@ If the reference is missing, ask which ticket to work.
    can proceed independently of the missing input. If hardware verification,
    user acceptance, or another prerequisite remains, leave the ticket open,
    record completed work and evidence plus exactly what remains, and mark it
-   blocked/release ownership when appropriate. Do not claim an unverified
-   outcome or stop useful independent work merely because final acceptance
-   requires the user.
+   blocked and release ownership with `kata unassign` when appropriate. Do not
+   claim an unverified outcome or stop useful independent work merely because
+   final acceptance requires the user.
 5. Otherwise, finish the repository's delivery workflow and close with typed
-   evidence per Phase 3. Report what changed, what was verified, the PR or commit
-   reference, and anything requiring the user's attention. Stop after this
-   ticket. Follow-up tickets may capture discoveries per Phase 3, but are not
-   authorization to implement additional work.
+   evidence per Phase 3. Record a concise outcome with the ticket reference,
+   status, changes, verification, PR or commit reference, and anything requiring
+   the user's attention. Follow-up tickets may capture discoveries per Phase 3,
+   but are not authorization to implement additional work.
 
 Example user message:
 
 ```text
-$kata work 9dff
+$kata work 9dff 7b2a
+$kata work 9dff 7b2a --inline
 ```
 
-### Backlog loop (`$kata goal`)
+### Backlog loop (`$kata goal [--inline]`)
 
-When the user invokes **`$kata goal`**, start a goal loop
-that drives the ready backlog to completion. This is an instruction to the
-agent through the skill, not a `kata goal` CLI subcommand.
+When the user invokes **`$kata goal [--inline]`**, work the ready backlog to
+completion. This is an instruction through the skill, not a `kata goal` CLI
+subcommand. The goal continuation runs in the parent. By default, the parent
+dispatches each ticket to a fresh worker; with `--inline`, it performs the
+ticket procedure itself.
 
-Call `create_goal` with the objective below, then begin working the ready
-backlog in this turn. Codex continues at idle turn boundaries while the goal
-is active. Audit `kata ready` and the ticket evidence before marking the goal
-complete; a pause, interruption, budget limit, or blocker does not establish
-completion. If `create_goal` is unavailable, present the objective as a
-`/goal` command for the user to run.
+Call `create_goal` with the objective below, substituting the selected mode,
+then begin work in this turn. Codex continues at idle turn boundaries while
+the goal is active.
+Audit `kata ready` and the ticket evidence before marking the goal complete;
+a pause, interruption, budget limit, or blocker does not establish completion.
+If `create_goal` is unavailable, present the objective as a `/goal` command for
+the user to run.
 
-**Goal objective (omit the `/goal` prefix when calling `create_goal`):**
+**Goal objective (replace `[MODE]` with the selected mode; omit the `/goal`
+prefix when calling `create_goal`):**
 
 ```
-Work the kata backlog to empty. Each turn: run `kata ready --json`, take the top ready ticket, do the work required to satisfy its acceptance criteria, verify it, then close it with typed evidence. If a ticket cannot proceed without input from me, comment what is blocking it and label it blocked, then move on. The condition is met when `kata ready` returns no tickets that are actionable without my input — i.e. every remaining ready ticket is labeled blocked pending an action from me, or the list is empty. Print the `kata ready` output each turn so completion can be verified.
+Work the kata backlog to empty. Each turn, run `kata ready --json` and choose one actionable ticket, descending to a ready child when a parent has open children. [MODE] After the ticket, inspect its recorded state and repeat with the latest `kata ready --json`. Stop when the list is empty or every remaining ready ticket is blocked pending an action from me. Print the final `kata ready --json` output.
 
-Use the kata skill and read each ticket’s full body, comments, and referenced guidance before implementation. Follow repository instructions where they override the generic skill, including branch/PR requirements. Follow each ticket’s verification plan and distinguish automated evidence from outstanding user acceptance. Before marking a ticket blocked, complete all implementation and verification that can proceed without the missing input, and leave a concrete handoff stating exactly what remains.
+For each ticket, read its full body, comments, referenced guidance, and repository instructions; follow the kata skill's Ticket procedure, satisfy acceptance criteria, verify, and close with typed evidence. If my input is needed, complete independent work first, record exactly what remains, label the ticket blocked, and release ownership. Do not treat a worker summary alone as proof of completion.
 ```
 
-**Per-iteration loop (what each goal turn does):**
+Use one of these exact substitutions for `[MODE]`:
 
-1. `kata ready --json` — list open tickets with no open blockers.
-2. Pick the top ticket and `kata show <ref> --json` to load full context (and
-   any referenced `./design/specs/` file).
+- Default: `Dispatch it to a fresh subagent with fork_turns set to none, so it has no inherited conversation history. Pass the reference and workspace path, have it load the kata skill, and wait for its concise result. Keep implementation and test logs in the worker's context.`
+- `--inline`: `Follow the kata skill's Ticket procedure for this ticket in the current conversation. Do not dispatch a subagent.`
+
+**Backlog iteration:**
+
+1. `kata ready --json` — list open tickets with no open blockers. In the default
+   mode, keep only selection fields in the parent transcript until the final audit.
+2. Select the top actionable ticket. In the default mode, filter `kata show <ref>
+   --json` before it reaches the parent transcript, retaining only status and
+   child references needed for selection; leave full context to the worker.
 3. **If it's a parent with open children, descend — don't implement the parent.**
    `kata ready` lists a parent story whenever it has no blockers of its own, even
    though its actual work lives in child tickets. Inspect the `children` array
@@ -315,35 +347,23 @@ Use the kata skill and read each ticket’s full body, comments, and referenced 
    and work a ready child instead (children surface in `kata ready` as their own
    blockers clear). Only close the parent once **all** its children are closed —
    the daemon refuses a parent-close while open children remain. Closing the last
-   child makes the parent the natural next pick. At parent completion, review
-   child evidence against the combined behavior and verify remaining integration
-   risks. Do not repeat every child's checks solely to close the parent; rerun
-   when later changes invalidate evidence or a required gate calls for it.
-4. **Claim the ticket you'll actually work** (the one resolved after the descend
-   check) so concurrent agents don't double-work it: `kata assign <ref>
-   <your-actor>` — your actor is what `kata whoami` reports.
-5. **Get on the right branch (see Phase 3 §1).** For a top-level feature story
-   (one with children), create or switch to its feature branch before working
-   its children; a small standalone ticket can stay on the default branch.
-6. Do the work needed to satisfy the ticket's acceptance criteria. Update tests
-   superseded by changed behavior and consolidate overlapping coverage touched
-   by the change; this is part of maintaining the feature. Preserve each distinct
-   assertion in retained coverage or explain why the requirement is retired.
-   Keep unrelated suite redesign as follow-up work.
-7. Run the selected verification checks and required gates; record the results
-   in the transcript so Codex can audit completion. While debugging,
-   rerun the affected case first. Broaden or repeat passing checks when new changes,
-   failures, integration risks, or explicit gates justify it, not automatically
-   after every edit. Evaluate material added runtime and fixture reliability
-   before retaining a new expensive scenario. Keep scenarios independently
-   diagnosable; do not combine them into one fragile, state-sharing mega-test.
-8. **Finish the ticket** per Phase 3.
-9. If the ticket can't proceed without the user, block it **and release it back
-   to the unowned pool** so it doesn't sit owned by you: `kata edit <ref> --label
-   blocked` then `kata unassign <ref> --comment "blocked on: <what you need>"`.
-   Continue to the next ready ticket.
-10. Stop when `kata ready` yields only blocked-on-user tickets (or parents whose
-    only open children are themselves blocked on you), or is empty.
+   child makes the parent the natural next pick. At parent completion, the
+   ticket implementer reviews child evidence against the combined behavior and
+   verifies remaining integration risks. It reruns checks when later changes
+   invalidate evidence or a required gate calls for it.
+4. In default mode, dispatch the selected ticket to a new subagent with
+   `fork_turns: "none"`; give it the reference and workspace path, and tell it
+   to load this skill and follow **Ticket procedure**. Wait for its result before
+   dispatching another worker. With `--inline`, follow **Ticket procedure** in
+   this conversation. Workers sharing a checkout must not edit in parallel.
+5. Check the recorded status with `kata show <ref> --json`, filtered in default
+   mode. If work stopped unexpectedly or left an actionable ticket open, inspect
+   what remains and retry only when there is a concrete path forward. Do not
+   repeatedly dispatch a failing ticket or claim goal completion with it still
+   actionable. Keep only a short outcome in the parent transcript. Re-run
+   `kata ready --json` rather than assuming the backlog has not changed.
+6. Stop when `kata ready` yields only blocked-on-user tickets (or parents whose
+   only open children are themselves blocked on you), or is empty.
 
 > The user's original framing for this loop: *"Iterate over new kata tickets
 > ready for work using `kata ready` and perform work necessary to close them

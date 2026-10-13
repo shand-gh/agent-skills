@@ -8,7 +8,7 @@ or `git pull` updates the installed skill without copying it elsewhere.
 
 | Skill | Purpose |
 | --- | --- |
-| kata: [Codex](codex/kata/SKILL.md) · [Claude Code](claude/kata/SKILL.md) | Plan, implement, verify, and close software work with the kata ticket tracker. Each version uses its harness's skill command syntax and goal workflow. |
+| kata: [Codex](codex/kata/SKILL.md) · [Claude Code](claude/kata/SKILL.md) | Plan, implement, verify, and close software work with the kata ticket tracker. `work` accepts one or more ticket IDs; `goal` works the ready backlog. Both use a fresh worker per ticket by default or the current session with `--inline`. |
 
 The kata skill contains agent instructions, not the kata executable. Install and
 configure the kata CLI separately; `kata quickstart` describes its workflow.
