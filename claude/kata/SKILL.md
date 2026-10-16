@@ -240,6 +240,12 @@ file and reference it from the ticket body instead of inlining everything.
 
 ## Phase 2 — Implementing tickets
 
+Choose `medium` effort for straightforward tickets and `high` effort when the
+work needs deeper reasoning, such as ambiguous behavior, complex debugging, or
+significant design decisions. Set the chosen effort when dispatching a worker if
+the harness supports per-invocation effort; otherwise use the available session
+setting. Respect a user-specified effort level.
+
 `--inline` is a skill option, not a kata CLI flag. With it, perform ticket work
 in the current conversation. Without it, use a fresh subagent for each ticket.
 The ticket procedure and completion rules are the same in both modes.

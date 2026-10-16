@@ -13,7 +13,7 @@ the Claude kata worker, so an edit or `git pull` updates them without copying.
 The kata skill contains agent instructions, not the kata executable. Install and
 configure the kata CLI separately; `kata quickstart` describes its workflow.
 Repository-specific instructions and your explicit requests still govern work.
-Claude Code's `kata-ticket-worker` uses a 30-turn limit and records progress in
+Claude Code's `kata-ticket-worker` uses a 50-turn limit and records progress in
 kata comments for fresh-worker handoffs. Codex keeps its existing worker
 behavior; both can read the same ticket comments.
 
