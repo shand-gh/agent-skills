@@ -1,8 +1,8 @@
 # Agent skills
 
 Personal skills for Codex and Claude Code. This repository is the source of
-truth: the installer links each harness to its own skill directory, so an edit
-or `git pull` updates the installed skill without copying it elsewhere.
+truth: the installer links each harness to its own skill directory and installs
+the Claude kata worker, so an edit or `git pull` updates them without copying.
 
 ## Available skills
 
@@ -13,6 +13,9 @@ or `git pull` updates the installed skill without copying it elsewhere.
 The kata skill contains agent instructions, not the kata executable. Install and
 configure the kata CLI separately; `kata quickstart` describes its workflow.
 Repository-specific instructions and your explicit requests still govern work.
+Claude Code's `kata-ticket-worker` uses a 30-turn limit and records progress in
+kata comments for fresh-worker handoffs. Codex keeps its existing worker
+behavior; both can read the same ticket comments.
 
 ## Install locally
 
@@ -32,6 +35,7 @@ creates links such as:
 ```text
 ~/.codex/skills/kata  -> /absolute/path/to/agent-skills/codex/kata
 ~/.claude/skills/kata -> /absolute/path/to/agent-skills/claude/kata
+~/.claude/agents/kata-ticket-worker.md -> /absolute/path/to/agent-skills/claude/agents/kata-ticket-worker.md
 ```
 
 It works from any working directory and leaves unrelated skills alone. Running
@@ -72,7 +76,8 @@ symlinks is a straightforward fit for personal skills you edit locally.
   the currently documented location, use the override below. See
   [Codex skill discovery](https://learn.chatgpt.com/docs/build-skills).
 - **Claude Code:** `~/.claude/skills/<name>/SKILL.md` is the documented personal
-  location; symlinked folders are supported. See
+  location; `~/.claude/agents/` holds the bounded kata worker. Symlinked files
+  and folders are supported. See
   [Claude Code skills](https://code.claude.com/docs/en/skills).
 
 ```sh
@@ -83,10 +88,10 @@ symlinks is a straightforward fit for personal skills you edit locally.
 Choose one Codex location; the installer does not migrate or remove skills in
 the other location.
 
-For custom configuration locations, specify either or both directories:
+For custom configuration locations, specify the relevant directories:
 
 ```sh
-./install.sh --codex-dir /path/to/codex/skills --claude-dir /path/to/claude/skills
+./install.sh --codex-dir /path/to/codex/skills --claude-dir /path/to/claude/skills --claude-agent-dir /path/to/claude/agents
 ```
 
 The script does not infer custom harness homes from environment variables.

@@ -6,12 +6,13 @@ usage() {
     cat <<'EOF'
 Usage: ./install.sh [options]
 
-Link skills from codex/ and claude/ into their respective harnesses.
+Link skills from codex/ and claude/, plus Claude agents, into their harnesses.
 
   --dry-run          Preview without changing files
   --backup           Move conflicting entries outside skill discovery paths
   --codex-dir DIR    Codex skills directory (default: ~/.codex/skills)
   --claude-dir DIR   Claude skills directory (default: ~/.claude/skills)
+  --claude-agent-dir DIR  Claude agents directory (default: ~/.claude/agents)
   -h, --help         Show this help
 
 For Codex's currently documented personal location:
@@ -28,14 +29,19 @@ dry_run=false
 backup=false
 codex_dir="$HOME/.codex/skills"
 claude_dir="$HOME/.claude/skills"
+claude_agent_dir="$HOME/.claude/agents"
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --dry-run) dry_run=true; shift ;;
         --backup) backup=true; shift ;;
-        --codex-dir|--claude-dir)
+        --codex-dir|--claude-dir|--claude-agent-dir)
             [ "$#" -ge 2 ] && [ -n "$2" ] || die "$1 needs a directory"
             case "$2" in --*) die "$1 needs a directory" ;; esac
-            if [ "$1" = --codex-dir ]; then codex_dir=$2; else claude_dir=$2; fi
+            case "$1" in
+                --codex-dir) codex_dir=$2 ;;
+                --claude-dir) claude_dir=$2 ;;
+                --claude-agent-dir) claude_agent_dir=$2 ;;
+            esac
             shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) die "Unknown option: $1 (use --help)" ;;
@@ -46,6 +52,7 @@ repo_dir=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 # Absolute destinations keep leading dashes safe and make reports unambiguous.
 case "$codex_dir" in /*) ;; *) codex_dir="$PWD/$codex_dir" ;; esac
 case "$claude_dir" in /*) ;; *) claude_dir="$PWD/$claude_dir" ;; esac
+case "$claude_agent_dir" in /*) ;; *) claude_agent_dir="$PWD/$claude_agent_dir" ;; esac
 destinations=("$codex_dir" "$claude_dir")
 harnesses=(codex claude)
 shopt -s nullglob
@@ -83,6 +90,20 @@ for index in 0 1; do
             conflicts=true
         fi
     done
+done
+if { [ -e "$claude_agent_dir" ] || [ -L "$claude_agent_dir" ]; } && [ ! -d "$claude_agent_dir" ]; then
+    die "Claude agents directory is not a directory: $claude_agent_dir"
+fi
+agents=("$repo_dir/claude/agents/"*.md)
+for entry in "${agents[@]}"; do
+    target="$claude_agent_dir/${entry##*/}"
+    if correct_link "$entry" "$target"; then
+        continue
+    fi
+    if { [ -e "$target" ] || [ -L "$target" ]; } && ! "$backup"; then
+        printf 'Conflict: %s (use --backup to preserve and replace it)\n' "$target" >&2
+        conflicts=true
+    fi
 done
 ! "$conflicts" || exit 1
 
@@ -139,4 +160,40 @@ for index in 0 1; do
             printf 'Linked: %s -> %s\n' "$target" "$source_dir"
         fi
     done
+done
+for entry in "${agents[@]}"; do
+    target="$claude_agent_dir/${entry##*/}"
+    if correct_link "$entry" "$target"; then
+        printf 'Unchanged: %s\n' "$target"
+        continue
+    fi
+    saved=''
+    if [ -e "$target" ] || [ -L "$target" ]; then
+        "$backup" || die "Destination appeared during installation: $target"
+        if "$dry_run"; then
+            printf 'Would back up: %s\n' "$target"
+        else
+            if [ -z "$backup_run" ]; then
+                backup_base="${XDG_STATE_HOME:-$HOME/.local/state}/agent-skills/backups"
+                mkdir -p -- "$backup_base"
+                backup_run=$(mktemp -d "$backup_base/install.XXXXXX")
+            fi
+            mkdir -p -- "$backup_run/claude-agents"
+            saved="$backup_run/claude-agents/${entry##*/}"
+            mv -- "$target" "$saved"
+            printf 'Backup: %s -> %s\n' "$target" "$saved"
+        fi
+    fi
+    if "$dry_run"; then
+        printf 'Would link: %s -> %s\n' "$target" "$entry"
+    else
+        mkdir -p -- "$claude_agent_dir"
+        if ! ln -s -- "$entry" "$target"; then
+            if [ -n "$saved" ] && [ ! -e "$target" ] && [ ! -L "$target" ]; then
+                mv -- "$saved" "$target"
+            fi
+            die "Could not create link: $target"
+        fi
+        printf 'Linked: %s -> %s\n' "$target" "$entry"
+    fi
 done

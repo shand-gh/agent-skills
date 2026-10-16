@@ -8,8 +8,8 @@ description: >-
   or non-trivial task into kata tickets — top-level tickets are Mike Cohn user
   stories with Gherkin acceptance criteria; search existing tickets first.
   WORK: `/kata work ID [ID ...]` works explicit tickets in order.
-  IMPLEMENT: `/kata goal` works the ready backlog, using a fresh worker per
-  ticket by default; `--inline` keeps work in the current session. FINISH:
+  IMPLEMENT: `/kata goal` works the ready backlog, using bounded fresh workers
+  and durable ticket handoffs by default; `--inline` keeps work in the current session. FINISH:
   commit (Conventional Commits)
   or merge, footer the kata ticket IDs, capture context as ticket comments, and
   file follow-up tickets for newly discovered work. Reach for this on essentially
@@ -253,13 +253,21 @@ as `kata#abc4`; accept `--inline` anywhere among the arguments. Do not start a
 `/goal` loop or select additional work from `kata ready`. If no reference is
 given, ask which ticket to work.
 
-By default, dispatch each ticket to a fresh foreground general-purpose
-subagent and wait before starting the next. Give it the ticket reference and
-workspace path; tell it to load the kata skill and follow the **Ticket procedure**
-below. Do not pass previous workers' transcripts. With `--inline`, follow that
-procedure yourself, one ticket at a time. After each ticket, check its recorded
-state. If blocked, report it and proceed to the next explicit reference. Stop
-after the last reference.
+By default, dispatch each ticket to a fresh foreground `kata-ticket-worker`
+subagent and wait before starting the next. Give it only the ticket reference
+and workspace path. This installed agent preloads the kata skill and has a
+`maxTurns` limit; its partial result is a handoff, not a reason to resume that
+agent. If it stops with work remaining, inspect the latest ticket handoff, then
+start a **new** worker for the same ticket. If there is no handoff, have that
+worker inspect the working tree. Never pass an old worker's transcript to its
+replacement. If the agent is unavailable, use a fresh general-purpose subagent
+with the same handoff rules and report that the turn limit was not enforced.
+With `--inline`, follow the procedure yourself. After
+each ticket, check its recorded state. Proceed to the next explicit reference
+only when this one is closed, blocked on user input, or cannot make further
+progress; report any unfinished ticket. If Claude reports a usage limit, stop
+dispatching and leave remaining refs for a later invocation. Stop after the
+last reference.
 
 ### Ticket procedure (one assigned reference)
 
@@ -274,15 +282,20 @@ inside a worker.
    a parent with open children, report that it is not yet ready for parent
    completion; do not expand the assignment to its children.
 2. Check dependencies and ownership, then claim the ticket with `kata assign
-   <ref> <actor>` using the actor from `kata whoami`. Do not take over another
-   agent's active work or implement prerequisite tickets implicitly. Follow
-   repository branch/PR rules wherever they override Phase 3's defaults.
+   <ref> <actor>` using the actor from `kata whoami` unless already assigned to
+   that actor. Do not take over another agent's active work or implement
+   prerequisite tickets implicitly. Follow repository branch/PR rules wherever
+   they override Phase 3's defaults.
 3. Complete the implementation and the ticket's verification plan. Favor simple
    designs, remove superseded code and tests while preserving still-required
    assertions, and avoid unrelated changes. Verify actual behavior at the
    appropriate layer; a test of the suspected cause alone does not establish
    that the user's reported flow works. Reuse relevant evidence and broaden
    testing only as required by the ticket, repository, or changed risks.
+   During long work, add concise progress comments at meaningful milestones so
+   a fresh worker can continue without the current transcript. Include the
+   branch, commit or uncommitted files, verification run and results, decisions,
+   and exact next action. Refresh the handoff before a long test or planned stop.
 4. Before declaring a blocker, finish all implementation and verification that
    can proceed independently of the missing input. If hardware verification,
    user acceptance, or another prerequisite remains, leave the ticket open,
@@ -290,7 +303,12 @@ inside a worker.
    blocked and release ownership with `kata unassign` when appropriate. Do not
    claim an unverified outcome or stop useful independent work merely because
    final acceptance requires the user.
-5. Otherwise, finish the repository's delivery workflow and close with typed
+5. If stopping before completion for a worker limit, usage interruption, or
+   other recoverable reason, leave the ticket open. Record or update the
+   handoff in a kata comment and release ownership unless another active worker
+   is taking over immediately. This is partial work, not a user blocker; do
+   not add the `blocked` label merely to remove it from `kata ready`.
+6. Otherwise, finish the repository's delivery workflow and close with typed
    evidence per Phase 3. Record a concise outcome with the ticket reference,
    status, changes, verification, PR or commit reference, and anything requiring
    the user's attention. Follow-up tickets may capture discoveries per Phase 3,
@@ -320,12 +338,12 @@ its goal evaluator confirms the condition.
 ```
 /goal Work the kata backlog to empty. Each turn, run `kata ready --json` and choose one actionable ticket, descending to a ready child when a parent has open children. [MODE] After the ticket, inspect its recorded state and repeat with the latest `kata ready --json`. Stop when the list is empty or every remaining ready ticket is blocked pending an action from me. Print the final `kata ready --json` output.
 
-For each ticket, read its full body, comments, referenced guidance, and repository instructions; follow the kata skill's Ticket procedure, satisfy acceptance criteria, verify, and close with typed evidence. If my input is needed, complete independent work first, record exactly what remains, label the ticket blocked, and release ownership. Do not treat a worker summary alone as proof of completion.
+For each ticket, read its full body, comments, referenced guidance, and repository instructions; follow the kata skill's Ticket procedure, satisfy acceptance criteria, verify, and close with typed evidence. If my input is needed, complete independent work first, record exactly what remains, label the ticket blocked, and release ownership. For partial work, use the ticket's durable handoff and a new worker on the same ticket; never resume a large worker session. If Claude reports a usage limit, stop dispatching until it resets. Do not treat a worker summary alone as proof of completion.
 ```
 
 Use one of these exact substitutions for `[MODE]`:
 
-- Default: `Dispatch it to a fresh foreground general-purpose subagent with no inherited conversation history. Pass the reference and workspace path, have it load the kata skill, and wait for its concise result. Keep implementation and test logs in the worker's context.`
+- Default: `Dispatch it to a fresh foreground kata-ticket-worker subagent with no inherited conversation history. Pass the reference and workspace path and wait for its concise result. If unavailable, use a fresh general-purpose subagent with the same handoff rules. Keep implementation and test logs in the worker's context.`
 - `--inline`: `Follow the kata skill's Ticket procedure for this ticket in the current conversation. Do not dispatch a subagent.`
 
 **Backlog iteration:**
@@ -347,17 +365,20 @@ Use one of these exact substitutions for `[MODE]`:
    verifies remaining integration risks. It reruns checks when later changes
    invalidate evidence or a required gate calls for it.
 4. In default mode, dispatch the selected ticket to a new foreground
-   general-purpose subagent; give it the reference and workspace path, and tell
-   it to load this skill and follow **Ticket procedure**. Wait for its result
-   before dispatching another worker. With `--inline`, follow **Ticket
+   `kata-ticket-worker` subagent; give it the reference and workspace path.
+   Wait for its result before dispatching another worker. With `--inline`, follow **Ticket
    procedure** in this conversation. Workers sharing a checkout must not edit
    in parallel.
 5. Check the recorded status with `kata show <ref> --json`, filtered in default
-   mode. If work stopped unexpectedly or left an actionable ticket open, inspect
-   what remains and retry only when there is a concrete path forward. Do not
-   repeatedly dispatch a failing ticket or claim goal completion with it still
-   actionable. Keep only a short outcome in the parent transcript. Re-run
-   `kata ready --json` rather than assuming the backlog has not changed.
+   mode. If the worker returned partial work, read its latest handoff comment
+   and dispatch a fresh worker for the **same** ticket; never resume its session.
+   If it stopped abruptly without a handoff, have the fresh worker reconstruct
+   progress from the ticket and working tree before changing code. If Claude
+   reports a usage limit, stop launching workers until usage resets; then start
+   a fresh worker from the handoff. If work repeatedly fails without progress,
+   report the obstacle and leave the ticket open; do not claim goal completion.
+   Keep only a short outcome in the parent transcript. Re-run `kata ready
+   --json` after each completed or blocked ticket.
 6. Stop when `kata ready` yields only blocked-on-user tickets (or parents whose
    only open children are themselves blocked on you), or is empty.
 
