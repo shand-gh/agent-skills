@@ -1,0 +1,4 @@
+interface:
+  display_name: "SlopMop"
+  short_description: "Identify and redesign generic visual patterns in web apps"
+  default_prompt: "Use $slopmop to audit this web app’s typography, palette, and composition, then refine the visual patterns that make it feel AI-generated."

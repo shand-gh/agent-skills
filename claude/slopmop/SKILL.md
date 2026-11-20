@@ -1,0 +1,1 @@
+../../codex/slopmop/SKILL.md

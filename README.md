@@ -9,6 +9,7 @@ the Claude kata worker, so an edit or `git pull` updates them without copying.
 | Skill | Purpose |
 | --- | --- |
 | kata: [Codex](codex/kata/SKILL.md) · [Claude Code](claude/kata/SKILL.md) | Plan, implement, verify, and close software work with the kata ticket tracker. `work` accepts one or more ticket IDs; `goal` works the ready backlog. Both use a fresh worker per ticket by default or the current session with `--inline`. |
+| SlopMop · [Codex](codex/slopmop/SKILL.md) · [Claude Code](claude/slopmop/SKILL.md) | Refine generic-looking web apps by auditing typography, color, layout, interface copy, and interaction states. |
 
 The kata skill contains agent instructions, not the kata executable. Install and
 configure the kata CLI separately; `kata quickstart` describes its workflow.
