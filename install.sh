@@ -6,7 +6,8 @@ usage() {
     cat <<'EOF'
 Usage: ./install.sh [options]
 
-Link skills from codex/ and claude/, plus Claude agents, into their harnesses.
+Install SlopMop and kata for Codex and Claude Code, plus the Claude kata worker.
+Additional skill directories under codex/ and claude/ are discovered automatically.
 
   --dry-run          Preview without changing files
   --backup           Move conflicting entries outside skill discovery paths
